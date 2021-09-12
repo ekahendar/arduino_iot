@@ -1,0 +1,158 @@
+#include <SPI.h>
+#include <Ethernet.h>
+#include <DHT.h>
+
+#define echoPin 3 // attach pin D2 Arduino to pin Echo of HC-SR04
+#define trigPin 2 //attach pin D3 Arduino to pin Trig of HC-SR04
+long duration; // variable for the duration of sound wave travel
+int distance; // variable for the distance measurement
+
+#define DHTPIN 5
+#define DHTTYPE DHT11
+DHT dht(DHTPIN, DHTTYPE);
+
+boolean statusR1 = false;
+String readString;
+int ledPin = 4;
+
+char c;
+byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED }; //physical mac address
+byte ip[] = { 169, 254, 28, 122 }; // IP address in LAN – need to change according to your Network address
+byte gateway[] = { 169, 254, 28, 125 }; // internet access via router
+byte subnet[] = { 255, 255, 0, 0 }; //subnet mask
+EthernetServer server(80); //server port
+
+void setup() 
+{
+  pinMode(trigPin, OUTPUT); // Sets the trigPin as an OUTPUT
+  pinMode(echoPin, INPUT); // Sets the echoPin as an INPUT
+  
+  pinMode(ledPin, OUTPUT); //pin selected to control
+    
+  Ethernet.begin(mac, ip);
+  server.begin();
+  dht.begin();
+}
+
+void hcsr()
+{
+  // Clears the trigPin condition
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  // Sets the trigPin HIGH (ACTIVE) for 10 microseconds
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  // Reads the echoPin, returns the sound wave travel time in microseconds
+  duration = pulseIn(echoPin, HIGH);
+  // Calculating the distance
+  distance = duration * 0.034 / 2; // Speed of sound wave divided by 2 (go and back) 
+}
+
+void loop() {
+hcsr();
+float r = distance;
+
+float h = dht.readHumidity();
+float t = dht.readTemperature();
+
+
+  EthernetClient client = server.available();
+  if (client) {
+     boolean currentLineIsBlank = true;
+    while (client.connected()) {
+      if (client.available()) {
+        c = client.read();
+        if (readString.length() < 100) {
+          readString += c;
+        }
+  if (c == '\n' && currentLineIsBlank) {
+  client.println("HTTP/1.1 200 OK");
+  client.println("Content-Type: text/html");
+  client.println();  
+  client.println("<HTML>");
+  client.println("<HEAD>");
+  client.println("<meta http-equiv=\"Refresh\" content=\"4; url=/ControlingIOT\" />");
+  client.println("<meta http-equiv=\"Content-Type\"      content=\"application/vnd.wap.xhtml+xml; charset=utf-8\" />");
+  //client.println("<link type=\"text/css\" rel=\"stylesheet\" href=\"http://haidao.mw.lt/js_css/css_pages.css\" />"); // LINK CSS ONLINE, JIKA TIDAK INGIN DI AKSES JADIKAN KOMENTAR SAJA //
+  client.println("<TITLE>Room Automation</TITLE>");
+  client.println("</HEAD>");
+  client.println("<BODY align=\"center\" bgcolor=\"#ffffff\">");
+  client.println("<h1><p align=\"left\">Belajar IOT </h1>");
+  client.println("<hr />");
+  client.println("<br />");
+  client.println("<br />");
+  client.println("<table align=\"center\"><tr>");
+  client.println("<th width=\"20%\">Nama Perangkat</th>");
+  client.println("<th width=\"20%\">Status Perangkat</th>");
+  client.println("<th width=\"20%\">Saklar ON/OFF</th></tr>");
+  client.println("<tr class=\"trh1\"><td align=\"center\">");
+  client.println(" ");
+  client.println(" ");
+  
+  client.println("LED");
+  client.println("</td><td align=\"center\">");
+  if (statusR1 == false) {
+    client.println("<b>MATI</b>");
+  } else {
+    client.println("<b>HIDUP</b>");
+  }
+    client.println("</td><td align=\"center\">");
+  if (statusR1 == false) {
+    client.println("<a href=\"/?LEDON\" />HIDUP</a>");
+  } else {
+    client.println("<a href=\"/?LEDOFF\" />MATI</a>");
+  }
+  client.println("</td></tr>");
+  client.println();
+ 
+   
+client.println("<H2>");
+client.print("Jarak Sensor: ");
+client.println("</H2>");
+client.println("<p />");
+client.println("<H1>");
+client.print(r);
+client.print(" cm");
+client.println("</H1>");
+client.println("<p />");
+client.println("<H2>");
+client.print("Humidity: ");
+client.println("</H2>");
+client.println("<p />");
+client.println("<H1>");
+client.print(h);
+client.print(" %\t");
+client.println("</H1>");
+client.println("<p />");
+client.println("<H2>");
+client.print("Temperature: ");
+client.println("</H2>");
+client.println("<H1>");
+client.print(t);
+client.println(" °");
+client.println("C");
+client.println("</H1>");
+client.println("</BODY>");
+delay(10);
+client.stop();
+
+if(readString.indexOf("?LEDON") > -1) //checks for LEDON
+  {
+  digitalWrite(ledPin, HIGH); // set pin high
+  statusR1 = true;
+  }
+else{
+    if(readString.indexOf("?LEDOFF") > -1) //checks for LEDOFF
+    {
+    digitalWrite(ledPin, LOW); // set pin low
+    statusR1 = false;
+    }}
+
+  if (c == '\n') {
+currentLineIsBlank = true;
+}
+else if (c != '\r') {
+currentLineIsBlank = false;
+}
+  readString=""; } } } } }
